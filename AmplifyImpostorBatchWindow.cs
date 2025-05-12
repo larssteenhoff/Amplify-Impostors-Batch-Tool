@@ -2,6 +2,8 @@ using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
 using AmplifyImpostors;
+using System.Linq;
+using System;
 
 public class AmplifyImpostorBatchWindow : EditorWindow
 {
@@ -17,9 +19,10 @@ public class AmplifyImpostorBatchWindow : EditorWindow
     private int batchProgressIndex = 0;
     private int batchTotal = 0;
     private bool isBatchRunning = false;
-    private enum OutputFolderMode { NextToPrefab, Custom }
+    private enum OutputFolderMode { NextToPrefab, NextToImpostorProfile, Custom }
     private OutputFolderMode outputFolderMode = OutputFolderMode.NextToPrefab;
     private string customOutputFolder = "";
+    private bool addLodIfMissing = true;
 
     [MenuItem("Window/Amplify Impostors/Batch Converter", false, 2002)]
     public static void ShowWindow()
@@ -95,6 +98,12 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                 }
                 EditorGUILayout.EndHorizontal();
                 EditorGUILayout.HelpBox($"Impostor assets will be saved to: {customOutputFolder}", MessageType.Info);
+            }
+            else if (outputFolderMode == OutputFolderMode.NextToImpostorProfile && globalSettings != null)
+            {
+                string impostorProfilePath = AssetDatabase.GetAssetPath(globalSettings);
+                string impostorProfileDir = !string.IsNullOrEmpty(impostorProfilePath) ? System.IO.Path.GetDirectoryName(impostorProfilePath) : "";
+                EditorGUILayout.HelpBox($"Impostor assets will be saved next to the assigned impostor profile: {impostorProfileDir}", MessageType.Info);
             }
             else
             {
@@ -180,6 +189,9 @@ public class AmplifyImpostorBatchWindow : EditorWindow
             EditorGUILayout.EndHorizontal();
         }
         EditorGUILayout.EndScrollView();
+
+        // Add LODGroup option
+        addLodIfMissing = EditorGUILayout.ToggleLeft("Add LODGroup if missing and set up LOD0/LOD1", addLodIfMissing);
     }
 
     private void HandleDragAndDrop(Rect dropArea)
@@ -252,6 +264,7 @@ public class AmplifyImpostorBatchWindow : EditorWindow
             try
             {
                 instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+                LODGroup lodGroup = instance.GetComponent<LODGroup>();
                 if (instance == null)
                 {
                     batchResults.Add($"[{idx}] Could not instantiate prefab: {prefab.name}");
@@ -262,6 +275,7 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                 AmplifyImpostor ai = instance.GetComponent<AmplifyImpostor>();
                 if (ai == null)
                     ai = instance.AddComponent<AmplifyImpostor>();
+                ai.RootTransform = instance.transform;
                 if (globalSettings == null)
                 {
                     batchResults.Add($"[{idx}] Global impostor settings asset is null.");
@@ -291,36 +305,125 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                     {
                         ai.m_folderPath = customOutputFolder;
                     }
+                    else if (outputFolderMode == OutputFolderMode.NextToImpostorProfile && globalSettings != null)
+                    {
+                        string impostorProfilePath = AssetDatabase.GetAssetPath(globalSettings);
+                        ai.m_folderPath = System.IO.Path.GetDirectoryName(impostorProfilePath);
+                    }
                     else
                     {
                         // Next to prefab
                         ai.m_folderPath = System.IO.Path.GetDirectoryName(path);
                     }
                 }
-                ai.RenderAllDeferredGroups(globalSettings);
 
-                // Automatically assign impostor to last LOD stage if LODGroup exists
-                LODGroup lodGroup = instance.GetComponent<LODGroup>();
-                if (lodGroup != null && ai.m_lastImpostor != null)
+                // Enhanced: Prefer child named 'LOD 0' for source, else all valid mesh/skinned renderers
+                var allRenderers = instance.GetComponentsInChildren<MeshRenderer>(true)
+                    .Where(r => r != null && r.enabled)
+                    .Where(r => {
+                        var mf = r.GetComponent<MeshFilter>();
+                        return mf != null && mf.sharedMesh != null;
+                    })
+                    .Cast<Renderer>()
+                    .ToList();
+                // Optionally, include SkinnedMeshRenderers with a valid mesh
+                allRenderers.AddRange(instance.GetComponentsInChildren<SkinnedMeshRenderer>(true)
+                    .Where(r => r != null && r.enabled && r.sharedMesh != null)
+                    .Cast<Renderer>());
+                Renderer[] sourceRenderers = allRenderers.ToArray();
+
+                // If you want to prefer a child named 'LOD 0', do this:
+                Transform lod0Child = instance.GetComponentsInChildren<Transform>(true)
+                    .FirstOrDefault(child => child.name.ToLower().Contains("lod 0"));
+                if (lod0Child != null)
+                {
+                    sourceRenderers = lod0Child.GetComponentsInChildren<MeshRenderer>(true)
+                        .Where(r => r != null && r.enabled)
+                        .Where(r => {
+                            var mf = r.GetComponent<MeshFilter>();
+                            return mf != null && mf.sharedMesh != null;
+                        })
+                        .Cast<Renderer>()
+                        .ToArray();
+                }
+
+                // If LODGroup exists, use LOD0's renderers as source (overrides above)
+                if (lodGroup != null)
                 {
                     var lods = lodGroup.GetLODs();
-                    if (lods != null && lods.Length > 0)
+                    if (lods.Length > 0 && lods[0].renderers != null && lods[0].renderers.Length > 0)
+                        sourceRenderers = lods[0].renderers;
+                }
+                else if (addLodIfMissing)
+                {
+                    // Add LODGroup and set up LOD0/LOD1
+                    lodGroup = instance.AddComponent<LODGroup>();
+                    LOD[] lods = new LOD[2];
+                    lods[0] = new LOD(0.5f, sourceRenderers); // LOD0: source mesh
+                    lods[1] = new LOD(0.01f, new Renderer[0]); // LOD1: impostor will be assigned after bake
+                    lodGroup.SetLODs(lods);
+                }
+
+                // Defensive: skip if no valid renderers
+                if (sourceRenderers == null || sourceRenderers.Length == 0)
+                {
+                    Debug.LogError($"No valid mesh renderers with meshes found for prefab: {prefab.name}. Skipping impostor bake.");
+                    continue;
+                }
+
+                ai.Renderers = sourceRenderers;
+
+                ai.RenderAllDeferredGroups(globalSettings);
+
+                // After baking, assign impostor to LOD1 (or last LOD) using only the renderers from the 'Impostor' child GameObject
+                GameObject impostorGO = ai.m_lastImpostor;
+                if (impostorGO != null)
+                {
+                    // Ensure the impostor GameObject is parented to the prefab root or LODGroup
+                    if (lodGroup != null)
                     {
-                        var impostorRenderers = ai.m_lastImpostor.GetComponentsInChildren<Renderer>();
-                        lods[lods.Length - 1].renderers = impostorRenderers;
-                        lodGroup.SetLODs(lods);
-                        Debug.Log($"Assigned impostor to last LOD for prefab: {prefab.name}");
+                        impostorGO.transform.SetParent(lodGroup.transform, false);
                     }
                     else
                     {
-                        Debug.LogWarning($"LODGroup on prefab {prefab.name} has no LODs.");
+                        impostorGO.transform.SetParent(instance.transform, false);
                     }
+                }
+
+                if (lodGroup != null && impostorGO != null)
+                {
+                    var lods = lodGroup.GetLODs();
+                    var impostorRenderers = impostorGO.GetComponentsInChildren<Renderer>();
+                    if (lods.Length >= 2)
+                    {
+                        lods[lods.Length - 1].renderers = impostorRenderers;
+                    }
+                    else if (lods.Length == 1)
+                    {
+                        // Add a second LOD for the impostor
+                        Array.Resize(ref lods, 2);
+                        lods[1] = new LOD(0.01f, impostorRenderers);
+                    }
+                    lodGroup.SetLODs(lods);
+                    Debug.Log($"Assigned impostor to last LOD for prefab: {prefab.name}");
+                }
+                else if (lodGroup == null && impostorGO != null && addLodIfMissing)
+                {
+                    // Add LODGroup and set up LOD0 (original), LOD1 (impostor)
+                    lodGroup = instance.AddComponent<LODGroup>();
+                    var origRenderers = sourceRenderers;
+                    var impostorRenderers = impostorGO.GetComponentsInChildren<Renderer>();
+                    LOD[] lods = new LOD[2];
+                    lods[0] = new LOD(0.5f, origRenderers);
+                    lods[1] = new LOD(0.01f, impostorRenderers);
+                    lodGroup.SetLODs(lods);
+                    Debug.Log($"Created LODGroup and assigned impostor to LOD1 for prefab: {prefab.name}");
                 }
                 else if (lodGroup == null)
                 {
                     Debug.Log($"No LODGroup found on prefab: {prefab.name}, impostor not assigned to LOD.");
                 }
-                else if (ai.m_lastImpostor == null)
+                else if (impostorGO == null)
                 {
                     Debug.LogWarning($"Impostor GameObject was not created for prefab: {prefab.name}.");
                 }

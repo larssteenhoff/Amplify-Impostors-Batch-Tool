@@ -333,8 +333,7 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                 Renderer[] sourceRenderers = allRenderers.ToArray();
 
                 // If you want to prefer a child named 'LOD 0', do this:
-                Transform lod0Child = instance.GetComponentsInChildren<Transform>(true)
-                    .FirstOrDefault(child => child.name.ToLower().Contains("lod 0"));
+                Transform lod0Child = instance.transform.Find("LOD0");
                 if (lod0Child != null)
                 {
                     sourceRenderers = lod0Child.GetComponentsInChildren<MeshRenderer>(true)
@@ -377,17 +376,39 @@ public class AmplifyImpostorBatchWindow : EditorWindow
 
                 // After baking, assign impostor to LOD1 (or last LOD) using only the renderers from the 'Impostor' child GameObject
                 GameObject impostorGO = ai.m_lastImpostor;
+                
+                // --- TVE: Copy material properties from source mesh to impostor mesh ---
+                if (impostorGO != null && sourceRenderers != null && sourceRenderers.Length > 0)
+                {
+                    // Get all source materials (from the first source renderer, or loop if you want to support multiple)
+                    var sourceMaterials = sourceRenderers[0].sharedMaterials;
+
+                    // Get all impostor materials (usually on the MeshRenderer of the impostorGO)
+                    var impostorRenderer = impostorGO.GetComponentInChildren<MeshRenderer>();
+                    if (impostorRenderer != null)
+                    {
+                        var impostorMaterials = impostorRenderer.sharedMaterials;
+                        int count = Mathf.Min(sourceMaterials.Length, impostorMaterials.Length);
+                        for (int i = 0; i < count; i++)
+                        {
+                            CopyMaterialProperties(sourceMaterials[i], impostorMaterials[i]);
+                        }
+                    }
+                }
+
                 if (impostorGO != null)
                 {
-                    // Ensure the impostor GameObject is parented to the prefab root or LODGroup
                     if (lodGroup != null)
-                    {
                         impostorGO.transform.SetParent(lodGroup.transform, false);
-                    }
                     else
-                    {
                         impostorGO.transform.SetParent(instance.transform, false);
-                    }
+
+                    impostorGO.transform.localPosition = Vector3.zero;
+                    impostorGO.transform.localRotation = Quaternion.identity;
+                    impostorGO.transform.localScale = Vector3.one;
+                    impostorGO.transform.position = impostorGO.transform.parent.position;
+                    impostorGO.transform.rotation = impostorGO.transform.parent.rotation;
+                    Debug.Log($"[BatchTool] Impostor '{impostorGO.name}' parent: {impostorGO.transform.parent?.name}, localPosition: {impostorGO.transform.localPosition}, localRotation: {impostorGO.transform.localRotation.eulerAngles}, localScale: {impostorGO.transform.localScale}");
                 }
 
                 if (lodGroup != null && impostorGO != null)
@@ -409,47 +430,11 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                 }
                 else if (lodGroup == null && impostorGO != null && addLodIfMissing)
                 {
-                    // Add LODGroup and set up LOD0 (original), LOD1 (impostor)
-                    lodGroup = instance.AddComponent<LODGroup>();
+                    // --- Create LOD0 child and move renderers if no LODGroup exists ---
                     var origRenderers = sourceRenderers;
-                    var impostorRenderers = impostorGO.GetComponentsInChildren<Renderer>();
-                    LOD[] lods = new LOD[2];
-                    lods[0] = new LOD(0.5f, origRenderers);
-                    lods[1] = new LOD(0.01f, impostorRenderers);
-                    lodGroup.SetLODs(lods);
-                    Debug.Log($"Created LODGroup and assigned impostor to LOD1 for prefab: {prefab.name}");
-                }
-                else if (lodGroup == null)
-                {
-                    Debug.Log($"No LODGroup found on prefab: {prefab.name}, impostor not assigned to LOD.");
-                }
-                else if (impostorGO == null)
-                {
-                    Debug.LogWarning($"Impostor GameObject was not created for prefab: {prefab.name}.");
-                }
-                if (batchMode == BatchMode.ModifyPrefabs)
-                    PrefabUtility.ApplyPrefabInstance(instance, InteractionMode.AutomatedAction);
-                batchResults.Add($"[{idx}] Success: {prefab.name}");
-                success++;
-            }
-            catch (System.Exception ex)
-            {
-                batchResults.Add($"[{idx}] Error processing {prefab?.name ?? "<null>"}: {ex}");
-                Debug.LogError($"[{idx}] Error processing {prefab?.name ?? "<null>"}: {ex}");
-                lastException = ex.ToString();
-                fail++;
-            }
-            finally
-            {
-                if (instance != null)
-                    DestroyImmediate(instance);
-            }
-        }
-        status = $"Batch complete. Success: {success}, Failed: {fail}";
-        isBatchRunning = false;
-        EditorUtility.ClearProgressBar();
-        AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
-        Repaint();
-    }
-} 
+                    if (lod0Child == null)
+                    {
+                        var lod0GO = new GameObject("LOD0");
+                        lod0GO.transform.SetParent(instance.transform, false);
+                        lod0GO.transform.localPosition = Vector3.zero;
+                        lod0GO.transform.localRotation = Quater

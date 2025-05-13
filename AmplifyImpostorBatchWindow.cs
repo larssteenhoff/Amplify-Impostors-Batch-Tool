@@ -428,12 +428,10 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                 // Copy material properties from the source mesh to the baked impostor material using TVEUtils
                 if (ai.Data.Material != null && sourceRenderers != null && sourceRenderers.Length > 0)
                 {
-                    var sourceMaterials = sourceRenderers[0].sharedMaterials;
-                    if (sourceMaterials != null && sourceMaterials.Length > 0 && sourceMaterials[0] != null)
+                    var meshRenderer = sourceRenderers[0] as MeshRenderer;
+                    if (meshRenderer != null)
                     {
-                        TVEUtils.CopyMaterialProperties(sourceMaterials[0], ai.Data.Material);
-                        TVEUtils.SetImpostorFeatures(sourceMaterials[0], ai.Data.Material);
-                        ai.Data.Material.SetFloat("_IsInitialized", 1);
+                        TVEUtils.CopyMaterialPropertiesToImpostor(meshRenderer, ai.Data.Material);
                         EditorUtility.SetDirty(ai.Data.Material);
                     }
                 }
@@ -448,12 +446,11 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                     int rendererCount = Mathf.Min(sourceRenderers.Length, impostorRenderers.Length);
                     for (int r = 0; r < rendererCount; r++)
                     {
-                        var sourceMaterials = sourceRenderers[r].sharedMaterials;
-                        var impostorMaterials = impostorRenderers[r].sharedMaterials;
-                        int matCount = Mathf.Min(sourceMaterials.Length, impostorMaterials.Length);
-                        for (int m = 0; m < matCount; m++)
+                        var meshRenderer = sourceRenderers[r] as MeshRenderer;
+                        var impostorMaterial = impostorRenderers[r].sharedMaterial;
+                        if (meshRenderer != null && impostorMaterial != null)
                         {
-                            CopyMaterialProperties(sourceMaterials[m], impostorMaterials[m]);
+                            TVEUtils.CopyMaterialPropertiesToImpostor(meshRenderer, impostorMaterial);
                         }
                     }
                 }
@@ -569,38 +566,6 @@ public class AmplifyImpostorBatchWindow : EditorWindow
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
         Repaint();
-    }
-
-    private static void CopyMaterialProperties(Material oldMaterial, Material newMaterial)
-    {
-        if (oldMaterial == null || newMaterial == null) return;
-        var oldShader = oldMaterial.shader;
-        var newShader = newMaterial.shader;
-#if UNITY_EDITOR
-        for (int i = 0; i < UnityEditor.ShaderUtil.GetPropertyCount(oldShader); i++)
-        {
-            for (int j = 0; j < UnityEditor.ShaderUtil.GetPropertyCount(newShader); j++)
-            {
-                var propertyName = UnityEditor.ShaderUtil.GetPropertyName(oldShader, i);
-                var propertyType = UnityEditor.ShaderUtil.GetPropertyType(oldShader, i);
-                if (propertyName == UnityEditor.ShaderUtil.GetPropertyName(newShader, j))
-                {
-                    if (propertyType == UnityEditor.ShaderUtil.ShaderPropertyType.Color || propertyType == UnityEditor.ShaderUtil.ShaderPropertyType.Vector)
-                    {
-                        newMaterial.SetVector(propertyName, oldMaterial.GetVector(propertyName));
-                    }
-                    if (propertyType == UnityEditor.ShaderUtil.ShaderPropertyType.Float || propertyType == UnityEditor.ShaderUtil.ShaderPropertyType.Range)
-                    {
-                        newMaterial.SetFloat(propertyName, oldMaterial.GetFloat(propertyName));
-                    }
-                    if (propertyType == UnityEditor.ShaderUtil.ShaderPropertyType.TexEnv)
-                    {
-                        newMaterial.SetTexture(propertyName, oldMaterial.GetTexture(propertyName));
-                    }
-                }
-            }
-        }
-#endif
     }
 }
 #endif 

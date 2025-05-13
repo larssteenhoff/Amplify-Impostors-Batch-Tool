@@ -1,9 +1,11 @@
+#if UNITY_EDITOR
 using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
 using AmplifyImpostors;
 using System.Linq;
 using System;
+using TheVisualEngine;
 
 public class AmplifyImpostorBatchWindow : EditorWindow
 {
@@ -11,8 +13,10 @@ public class AmplifyImpostorBatchWindow : EditorWindow
     private Vector2 scrollPos;
     private AmplifyImpostorAsset globalSettings;
     private string status = "";
-    private enum BatchMode { ModifyPrefabs, BakeOnly }
-    private BatchMode batchMode = BatchMode.BakeOnly;
+    // private enum BatchMode { ModifyPrefabs, BakeOnly }
+    private enum BatchMode { ModifyPrefabs /*, BakeOnly*/ } // 'BakeOnly' commented out
+    // private BatchMode batchMode = BatchMode.BakeOnly;
+    private BatchMode batchMode = BatchMode.ModifyPrefabs; // Default to ModifyPrefabs
     private string lastException = null;
     private bool shouldRunBatch = false;
     private List<string> batchResults = new List<string>();
@@ -49,11 +53,13 @@ public class AmplifyImpostorBatchWindow : EditorWindow
 
         // Mode selection
         EditorGUILayout.LabelField("Batch Mode:", EditorStyles.label);
-        batchMode = (BatchMode)EditorGUILayout.EnumPopup("Mode", batchMode);
-        string modeDesc = batchMode == BatchMode.ModifyPrefabs ?
-            "Modify Prefabs: The original prefabs will be updated with the impostor component and settings." :
-            "Bake Only: Impostors will be baked, but the original prefabs will not be modified.";
-        EditorGUILayout.HelpBox(modeDesc, MessageType.Info);
+        // batchMode = (BatchMode)EditorGUILayout.EnumPopup("Mode", batchMode);
+        // string modeDesc = batchMode == BatchMode.ModifyPrefabs ?
+        //     "Modify Prefabs: The original prefabs will be updated with the impostor component and settings." :
+        //     "Bake Only: Impostors will be baked, but the original prefabs will not be modified.";
+        // EditorGUILayout.HelpBox(modeDesc, MessageType.Info);
+        // EditorGUILayout.Space();
+        EditorGUILayout.HelpBox("Modify Prefabs: The original prefabs will be updated with the impostor component and settings.", MessageType.Info);
         EditorGUILayout.Space();
 
         // Global impostor settings
@@ -70,46 +76,46 @@ public class AmplifyImpostorBatchWindow : EditorWindow
         }
 
         // Output folder selection for Bake Only mode (moved here, before prefab list)
-        if (batchMode == BatchMode.BakeOnly)
-        {
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Output Folder for Impostor Assets", EditorStyles.boldLabel);
-            outputFolderMode = (OutputFolderMode)EditorGUILayout.EnumPopup("Save Location", outputFolderMode);
-            if (outputFolderMode == OutputFolderMode.Custom)
-            {
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Custom Folder:", GUILayout.Width(100));
-                customOutputFolder = EditorGUILayout.TextField(customOutputFolder);
-                if (GUILayout.Button("...", GUILayout.Width(30)))
-                {
-                    string selected = EditorUtility.OpenFolderPanel("Select Output Folder", string.IsNullOrEmpty(customOutputFolder) ? Application.dataPath : customOutputFolder, "");
-                    if (!string.IsNullOrEmpty(selected))
-                    {
-                        // Convert absolute path to relative project path if possible
-                        if (selected.StartsWith(Application.dataPath))
-                        {
-                            customOutputFolder = "Assets" + selected.Substring(Application.dataPath.Length);
-                        }
-                        else
-                        {
-                            customOutputFolder = selected;
-                        }
-                    }
-                }
-                EditorGUILayout.EndHorizontal();
-                EditorGUILayout.HelpBox($"Impostor assets will be saved to: {customOutputFolder}", MessageType.Info);
-            }
-            else if (outputFolderMode == OutputFolderMode.NextToImpostorProfile && globalSettings != null)
-            {
-                string impostorProfilePath = AssetDatabase.GetAssetPath(globalSettings);
-                string impostorProfileDir = !string.IsNullOrEmpty(impostorProfilePath) ? System.IO.Path.GetDirectoryName(impostorProfilePath) : "";
-                EditorGUILayout.HelpBox($"Impostor assets will be saved next to the assigned impostor profile: {impostorProfileDir}", MessageType.Info);
-            }
-            else
-            {
-                EditorGUILayout.HelpBox("Impostor assets will be saved next to each prefab.", MessageType.Info);
-            }
-        }
+        // if (batchMode == BatchMode.BakeOnly)
+        // {
+        //     EditorGUILayout.Space();
+        //     EditorGUILayout.LabelField("Output Folder for Impostor Assets", EditorStyles.boldLabel);
+        //     outputFolderMode = (OutputFolderMode)EditorGUILayout.EnumPopup("Save Location", outputFolderMode);
+        //     if (outputFolderMode == OutputFolderMode.Custom)
+        //     {
+        //         EditorGUILayout.BeginHorizontal();
+        //         EditorGUILayout.LabelField("Custom Folder:", GUILayout.Width(100));
+        //         customOutputFolder = EditorGUILayout.TextField(customOutputFolder);
+        //         if (GUILayout.Button("...", GUILayout.Width(30)))
+        //         {
+        //             string selected = EditorUtility.OpenFolderPanel("Select Output Folder", string.IsNullOrEmpty(customOutputFolder) ? Application.dataPath : customOutputFolder, "");
+        //             if (!string.IsNullOrEmpty(selected))
+        //             {
+        //                 // Convert absolute path to relative project path if possible
+        //                 if (selected.StartsWith(Application.dataPath))
+        //                 {
+        //                     customOutputFolder = "Assets" + selected.Substring(Application.dataPath.Length);
+        //                 }
+        //                 else
+        //                 {
+        //                     customOutputFolder = selected;
+        //                 }
+        //             }
+        //         }
+        //         EditorGUILayout.EndHorizontal();
+        //         EditorGUILayout.HelpBox($"Impostor assets will be saved to: {customOutputFolder}", MessageType.Info);
+        //     }
+        //     else if (outputFolderMode == OutputFolderMode.NextToImpostorProfile && globalSettings != null)
+        //     {
+        //         string impostorProfilePath = AssetDatabase.GetAssetPath(globalSettings);
+        //         string impostorProfileDir = !string.IsNullOrEmpty(impostorProfilePath) ? System.IO.Path.GetDirectoryName(impostorProfilePath) : "";
+        //         EditorGUILayout.HelpBox($"Impostor assets will be saved next to the assigned impostor profile: {impostorProfileDir}", MessageType.Info);
+        //     }
+        //     else
+        //     {
+        //         EditorGUILayout.HelpBox("Impostor assets will be saved next to each prefab.", MessageType.Info);
+        //     }
+        // }
 
         EditorGUILayout.Space();
         EditorGUI.BeginDisabledGroup(isBatchRunning);
@@ -272,51 +278,9 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                     fail++;
                     continue;
                 }
-                AmplifyImpostor ai = instance.GetComponent<AmplifyImpostor>();
-                if (ai == null)
-                    ai = instance.AddComponent<AmplifyImpostor>();
-                ai.RootTransform = instance.transform;
-                if (globalSettings == null)
-                {
-                    batchResults.Add($"[{idx}] Global impostor settings asset is null.");
-                    Debug.LogError($"[{idx}] Global impostor settings asset is null.");
-                    fail++;
-                    continue;
-                }
-                ai.Data = globalSettings;
-                if (ai.Data == null)
-                {
-                    batchResults.Add($"[{idx}] AmplifyImpostor.Data is null for prefab {prefab.name}");
-                    Debug.LogError($"[{idx}] AmplifyImpostor.Data is null for prefab {prefab.name}");
-                    fail++;
-                    continue;
-                }
-                if (ai.Data.Preset == null)
-                {
-                    batchResults.Add($"[{idx}] AmplifyImpostorAsset.Preset is null for prefab {prefab.name}.");
-                    Debug.LogError($"[{idx}] AmplifyImpostorAsset.Preset is null for prefab {prefab.name}.");
-                    fail++;
-                    continue;
-                }
-                // Set output folder for Bake Only mode
-                if (batchMode == BatchMode.BakeOnly)
-                {
-                    if (outputFolderMode == OutputFolderMode.Custom && !string.IsNullOrEmpty(customOutputFolder))
-                    {
-                        ai.m_folderPath = customOutputFolder;
-                    }
-                    else if (outputFolderMode == OutputFolderMode.NextToImpostorProfile && globalSettings != null)
-                    {
-                        string impostorProfilePath = AssetDatabase.GetAssetPath(globalSettings);
-                        ai.m_folderPath = System.IO.Path.GetDirectoryName(impostorProfilePath);
-                    }
-                    else
-                    {
-                        // Next to prefab
-                        ai.m_folderPath = System.IO.Path.GetDirectoryName(path);
-                    }
-                }
-
+                // --- FIX: Define and populate sourceRenderers and lod0Child here ---
+                Renderer[] sourceRenderers = null;
+                Transform lod0Child = null;
                 // Enhanced: Prefer child named 'LOD 0' for source, else all valid mesh/skinned renderers
                 var allRenderers = instance.GetComponentsInChildren<MeshRenderer>(true)
                     .Where(r => r != null && r.enabled)
@@ -330,10 +294,10 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                 allRenderers.AddRange(instance.GetComponentsInChildren<SkinnedMeshRenderer>(true)
                     .Where(r => r != null && r.enabled && r.sharedMesh != null)
                     .Cast<Renderer>());
-                Renderer[] sourceRenderers = allRenderers.ToArray();
+                sourceRenderers = allRenderers.ToArray();
 
                 // If you want to prefer a child named 'LOD 0', do this:
-                Transform lod0Child = instance.transform.Find("LOD0");
+                lod0Child = instance.transform.Find("LOD0");
                 if (lod0Child != null)
                 {
                     sourceRenderers = lod0Child.GetComponentsInChildren<MeshRenderer>(true)
@@ -370,9 +334,109 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                     continue;
                 }
 
-                ai.Renderers = sourceRenderers;
+                // Ensure the source mesh is set for each renderer
+                foreach (var renderer in sourceRenderers)
+                {
+                    var meshRenderer = renderer as MeshRenderer;
+                    if (meshRenderer != null)
+                    {
+                        var meshFilter = meshRenderer.GetComponent<MeshFilter>();
+                        if (meshFilter != null && meshFilter.sharedMesh == null)
+                        {
+                            // Try to assign the mesh from the prefab if possible
+                            var prefabMeshFilter = PrefabUtility.GetCorrespondingObjectFromSource(meshFilter) as MeshFilter;
+                            if (prefabMeshFilter != null && prefabMeshFilter.sharedMesh != null)
+                            {
+                                meshFilter.sharedMesh = prefabMeshFilter.sharedMesh;
+                            }
+                        }
+                    }
+                }
 
-                ai.RenderAllDeferredGroups(globalSettings);
+                AmplifyImpostor ai = instance.GetComponent<AmplifyImpostor>();
+                if (ai == null)
+                    ai = instance.AddComponent<AmplifyImpostor>();
+                ai.RootTransform = instance.transform;
+                if (globalSettings == null)
+                {
+                    batchResults.Add($"[{idx}] Global impostor settings asset is null.");
+                    Debug.LogError($"[{idx}] Global impostor settings asset is null.");
+                    fail++;
+                    continue;
+                }
+                // Create unique AmplifyImpostorAsset
+                string prefabDir = System.IO.Path.GetDirectoryName(path);
+                string impostorAssetPath = System.IO.Path.Combine(prefabDir, prefab.name + "_Impostor.asset").Replace("\\", "/");
+                string presetAssetPath = System.IO.Path.Combine(prefabDir, prefab.name + "_ImpostorPreset.asset").Replace("\\", "/");
+
+                // Create and copy AmplifyImpostorAsset
+                AmplifyImpostors.AmplifyImpostorAsset newAsset = ScriptableObject.CreateInstance<AmplifyImpostors.AmplifyImpostorAsset>();
+                AmplifyImpostors.AmplifyImpostorAsset refAsset = globalSettings;
+                // Do NOT copy Material and Mesh from the globalSettings; let the bake process generate and store them
+                // newAsset.Material = refAsset.Material;
+                // newAsset.Mesh = refAsset.Mesh;
+                newAsset.Version = refAsset.Version;
+                newAsset.ImpostorType = refAsset.ImpostorType;
+                newAsset.LockedSizes = refAsset.LockedSizes;
+                newAsset.SelectedSize = refAsset.SelectedSize;
+                newAsset.TexSize = refAsset.TexSize;
+                newAsset.DecoupleAxisFrames = refAsset.DecoupleAxisFrames;
+                newAsset.HorizontalFrames = refAsset.HorizontalFrames;
+                newAsset.VerticalFrames = refAsset.VerticalFrames;
+                newAsset.PixelPadding = refAsset.PixelPadding;
+                newAsset.MaxVertices = refAsset.MaxVertices;
+                newAsset.Tolerance = refAsset.Tolerance;
+                newAsset.NormalScale = refAsset.NormalScale;
+                newAsset.ShapePoints = (Vector2[])refAsset.ShapePoints.Clone();
+                // Reuse the global preset
+                newAsset.Preset = refAsset.Preset;
+                newAsset.OverrideOutput = new System.Collections.Generic.List<AmplifyImpostors.TextureOutput>();
+                foreach (var output in refAsset.OverrideOutput)
+                {
+                    newAsset.OverrideOutput.Add(output != null ? output.Clone() : null);
+                }
+                AssetDatabase.CreateAsset(newAsset, impostorAssetPath);
+
+                ai.Data = newAsset;
+                AssetDatabase.SaveAssets(); // Ensure the asset is registered before baking
+
+                ai.Renderers = sourceRenderers;
+                ai.m_impostorName = prefab.name + "_Impostor";
+                ai.RenderAllDeferredGroups(ai.Data);
+                AssetDatabase.SaveAssets(); // Ensure sub-assets are saved
+
+                // Ensure impostor GameObject uses the correct mesh and material
+                if (ai.m_lastImpostor != null && ai.Data != null)
+                {
+                    var mf = ai.m_lastImpostor.GetComponent<MeshFilter>();
+                    if (mf != null) mf.sharedMesh = ai.Data.Mesh;
+                    var mr = ai.m_lastImpostor.GetComponent<MeshRenderer>();
+                    if (mr != null) mr.sharedMaterial = ai.Data.Material;
+                }
+
+                // After baking, ensure mesh and material are sub-assets of the impostor asset
+                if (ai.Data != null)
+                {
+                    if (ai.Data.Mesh != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(ai.Data.Mesh)))
+                        AssetDatabase.AddObjectToAsset(ai.Data.Mesh, ai.Data);
+                    if (ai.Data.Material != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(ai.Data.Material)))
+                        AssetDatabase.AddObjectToAsset(ai.Data.Material, ai.Data);
+                    AssetDatabase.SaveAssets();
+                    AssetDatabase.Refresh();
+                }
+
+                // Copy material properties from the source mesh to the baked impostor material using TVEUtils
+                if (ai.Data.Material != null && sourceRenderers != null && sourceRenderers.Length > 0)
+                {
+                    var sourceMaterials = sourceRenderers[0].sharedMaterials;
+                    if (sourceMaterials != null && sourceMaterials.Length > 0 && sourceMaterials[0] != null)
+                    {
+                        TVEUtils.CopyMaterialProperties(sourceMaterials[0], ai.Data.Material);
+                        TVEUtils.SetImpostorFeatures(sourceMaterials[0], ai.Data.Material);
+                        ai.Data.Material.SetFloat("_IsInitialized", 1);
+                        EditorUtility.SetDirty(ai.Data.Material);
+                    }
+                }
 
                 // After baking, assign impostor to LOD1 (or last LOD) using only the renderers from the 'Impostor' child GameObject
                 GameObject impostorGO = ai.m_lastImpostor;
@@ -380,18 +444,16 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                 // --- TVE: Copy material properties from source mesh to impostor mesh ---
                 if (impostorGO != null && sourceRenderers != null && sourceRenderers.Length > 0)
                 {
-                    // Get all source materials (from the first source renderer, or loop if you want to support multiple)
-                    var sourceMaterials = sourceRenderers[0].sharedMaterials;
-
-                    // Get all impostor materials (usually on the MeshRenderer of the impostorGO)
-                    var impostorRenderer = impostorGO.GetComponentInChildren<MeshRenderer>();
-                    if (impostorRenderer != null)
+                    var impostorRenderers = impostorGO.GetComponentsInChildren<MeshRenderer>(true);
+                    int rendererCount = Mathf.Min(sourceRenderers.Length, impostorRenderers.Length);
+                    for (int r = 0; r < rendererCount; r++)
                     {
-                        var impostorMaterials = impostorRenderer.sharedMaterials;
-                        int count = Mathf.Min(sourceMaterials.Length, impostorMaterials.Length);
-                        for (int i = 0; i < count; i++)
+                        var sourceMaterials = sourceRenderers[r].sharedMaterials;
+                        var impostorMaterials = impostorRenderers[r].sharedMaterials;
+                        int matCount = Mathf.Min(sourceMaterials.Length, impostorMaterials.Length);
+                        for (int m = 0; m < matCount; m++)
                         {
-                            CopyMaterialProperties(sourceMaterials[i], impostorMaterials[i]);
+                            CopyMaterialProperties(sourceMaterials[m], impostorMaterials[m]);
                         }
                     }
                 }
@@ -437,4 +499,108 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                         var lod0GO = new GameObject("LOD0");
                         lod0GO.transform.SetParent(instance.transform, false);
                         lod0GO.transform.localPosition = Vector3.zero;
-                        lod0GO.transform.localRotation = Quater
+                        lod0GO.transform.localRotation = Quaternion.identity;
+                        lod0GO.transform.localScale = Vector3.one;
+                        lod0Child = lod0GO.transform;
+                        foreach (var renderer in origRenderers)
+                        {
+                            if (renderer != null)
+                            {
+                                renderer.transform.SetParent(lod0Child, false);
+                                renderer.transform.localPosition = Vector3.zero;
+                                renderer.transform.localRotation = Quaternion.identity;
+                                renderer.transform.localScale = Vector3.one;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        origRenderers = lod0Child.GetComponentsInChildren<Renderer>(true)
+                            .Where(r => r != null && r.enabled && r.GetComponent<MeshFilter>()?.sharedMesh != null)
+                            .ToArray();
+                        lod0Child.localPosition = Vector3.zero;
+                        lod0Child.localRotation = Quaternion.identity;
+                        lod0Child.localScale = Vector3.one;
+                        foreach (Transform child in lod0Child)
+                        {
+                            child.localPosition = Vector3.zero;
+                            child.localRotation = Quaternion.identity;
+                            child.localScale = Vector3.one;
+                        }
+                    }
+                    // Add LODGroup and set up LOD0 (original), LOD1 (impostor)
+                    lodGroup = instance.AddComponent<LODGroup>();
+                    var impostorRenderers = impostorGO.GetComponentsInChildren<Renderer>();
+                    LOD[] lods = new LOD[2];
+                    lods[0] = new LOD(0.5f, origRenderers);
+                    lods[1] = new LOD(0.01f, impostorRenderers);
+                    lodGroup.SetLODs(lods);
+                    Debug.Log($"Created LODGroup and assigned impostor to LOD1 for prefab: {prefab.name}");
+                }
+                else if (lodGroup == null)
+                {
+                    Debug.Log($"No LODGroup found on prefab: {prefab.name}, impostor not assigned to LOD.");
+                }
+                else if (impostorGO == null)
+                {
+                    Debug.LogWarning($"Impostor GameObject was not created for prefab: {prefab.name}.");
+                }
+                if (batchMode == BatchMode.ModifyPrefabs && impostorGO != null)
+                    PrefabUtility.ApplyPrefabInstance(instance, InteractionMode.AutomatedAction);
+                batchResults.Add($"[{idx}] Success: {prefab.name}");
+                success++;
+            }
+            catch (System.Exception ex)
+            {
+                batchResults.Add($"[{idx}] Error processing {prefab?.name ?? "<null>"}: {ex}");
+                Debug.LogError($"[{idx}] Error processing {prefab?.name ?? "<null>"}: {ex}");
+                lastException = ex.ToString();
+                fail++;
+            }
+            finally
+            {
+                if (instance != null)
+                    DestroyImmediate(instance);
+            }
+        }
+        status = $"Batch complete. Success: {success}, Failed: {fail}";
+        isBatchRunning = false;
+        EditorUtility.ClearProgressBar();
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Repaint();
+    }
+
+    private static void CopyMaterialProperties(Material oldMaterial, Material newMaterial)
+    {
+        if (oldMaterial == null || newMaterial == null) return;
+        var oldShader = oldMaterial.shader;
+        var newShader = newMaterial.shader;
+#if UNITY_EDITOR
+        for (int i = 0; i < UnityEditor.ShaderUtil.GetPropertyCount(oldShader); i++)
+        {
+            for (int j = 0; j < UnityEditor.ShaderUtil.GetPropertyCount(newShader); j++)
+            {
+                var propertyName = UnityEditor.ShaderUtil.GetPropertyName(oldShader, i);
+                var propertyType = UnityEditor.ShaderUtil.GetPropertyType(oldShader, i);
+                if (propertyName == UnityEditor.ShaderUtil.GetPropertyName(newShader, j))
+                {
+                    if (propertyType == UnityEditor.ShaderUtil.ShaderPropertyType.Color || propertyType == UnityEditor.ShaderUtil.ShaderPropertyType.Vector)
+                    {
+                        newMaterial.SetVector(propertyName, oldMaterial.GetVector(propertyName));
+                    }
+                    if (propertyType == UnityEditor.ShaderUtil.ShaderPropertyType.Float || propertyType == UnityEditor.ShaderUtil.ShaderPropertyType.Range)
+                    {
+                        newMaterial.SetFloat(propertyName, oldMaterial.GetFloat(propertyName));
+                    }
+                    if (propertyType == UnityEditor.ShaderUtil.ShaderPropertyType.TexEnv)
+                    {
+                        newMaterial.SetTexture(propertyName, oldMaterial.GetTexture(propertyName));
+                    }
+                }
+            }
+        }
+#endif
+    }
+}
+#endif 

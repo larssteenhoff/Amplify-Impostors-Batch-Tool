@@ -446,13 +446,9 @@ public class AmplifyImpostorBatchWindow : EditorWindow
 
                 if (meshRenderer != null && ai.Data.Material != null)
                 {
-                    var srcMat = meshRenderer.sharedMaterial;
-                    var dstMat = ai.Data.Material;
-                    TVEUtils.CopyMaterialProperties(srcMat, dstMat);
-                    TVEUtils.SetImpostorFeatures(srcMat, dstMat);
-                    dstMat.SetFloat("_IsInitialized", 1);
-                    TVEUtils.SetMaterialSettings(dstMat);
-                    EditorUtility.SetDirty(dstMat);
+                    TVEUtils.CopyMaterialPropertiesToImpostor(meshRenderer, ai.Data.Material);
+                    TVEUtils.SetMaterialSettings(ai.Data.Material);
+                    EditorUtility.SetDirty(ai.Data.Material);
                 }
                 else
                 {
@@ -473,10 +469,7 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                         var impostorMaterial = impostorRenderers[r].sharedMaterial;
                         if (meshRenderer2 != null && impostorMaterial != null)
                         {
-                            var srcMat2 = meshRenderer2.sharedMaterial;
-                            TVEUtils.CopyMaterialProperties(srcMat2, impostorMaterial);
-                            TVEUtils.SetImpostorFeatures(srcMat2, impostorMaterial);
-                            impostorMaterial.SetFloat("_IsInitialized", 1);
+                            TVEUtils.CopyMaterialPropertiesToImpostor(meshRenderer2, impostorMaterial);
                             TVEUtils.SetMaterialSettings(impostorMaterial);
                             EditorUtility.SetDirty(impostorMaterial);
                         }

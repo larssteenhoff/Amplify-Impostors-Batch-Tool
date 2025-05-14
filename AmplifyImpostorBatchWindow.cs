@@ -436,23 +436,17 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                 }
 
                 // Copy material properties from the source mesh to the baked impostor material using TVE inspector logic
-                Material srcMat = null;
-                string impostorType = TVEUtils.GetShaderLightingType(ai.Data.Material);
+                MeshRenderer meshRenderer = null;
                 foreach (var r in sourceRenderers)
                 {
-                    var mr = r as MeshRenderer;
-                    if (mr != null && mr.sharedMaterial != null)
-                    {
-                        var type = TVEUtils.GetShaderLightingType(mr.sharedMaterial);
-                        if (type == impostorType)
-                        {
-                            srcMat = mr.sharedMaterial;
-                            break;
-                        }
-                    }
+                    meshRenderer = r as MeshRenderer;
+                    if (meshRenderer != null && meshRenderer.sharedMaterial != null)
+                        break;
                 }
-                if (srcMat != null && ai.Data.Material != null)
+
+                if (meshRenderer != null && ai.Data.Material != null)
                 {
+                    var srcMat = meshRenderer.sharedMaterial;
                     var dstMat = ai.Data.Material;
                     TVEUtils.CopyMaterialProperties(srcMat, dstMat);
                     TVEUtils.SetImpostorFeatures(srcMat, dstMat);
@@ -462,7 +456,7 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                 }
                 else
                 {
-                    Debug.LogWarning($"[BatchTool] No valid MeshRenderer with matching material type found for prefab: {prefab.name}");
+                    Debug.LogWarning($"[BatchTool] No valid MeshRenderer with material found for prefab: {prefab.name}");
                 }
 
                 // After baking, assign impostor to LOD1 (or last LOD) using only the renderers from the 'Impostor' child GameObject
@@ -479,17 +473,12 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                         var impostorMaterial = impostorRenderers[r].sharedMaterial;
                         if (meshRenderer2 != null && impostorMaterial != null)
                         {
-                            var impostorType2 = TVEUtils.GetShaderLightingType(impostorMaterial);
                             var srcMat2 = meshRenderer2.sharedMaterial;
-                            var srcType2 = TVEUtils.GetShaderLightingType(srcMat2);
-                            if (srcType2 == impostorType2)
-                            {
-                                TVEUtils.CopyMaterialProperties(srcMat2, impostorMaterial);
-                                TVEUtils.SetImpostorFeatures(srcMat2, impostorMaterial);
-                                impostorMaterial.SetFloat("_IsInitialized", 1);
-                                TVEUtils.SetMaterialSettings(impostorMaterial);
-                                EditorUtility.SetDirty(impostorMaterial);
-                            }
+                            TVEUtils.CopyMaterialProperties(srcMat2, impostorMaterial);
+                            TVEUtils.SetImpostorFeatures(srcMat2, impostorMaterial);
+                            impostorMaterial.SetFloat("_IsInitialized", 1);
+                            TVEUtils.SetMaterialSettings(impostorMaterial);
+                            EditorUtility.SetDirty(impostorMaterial);
                         }
                     }
                 }

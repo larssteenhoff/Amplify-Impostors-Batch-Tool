@@ -30,6 +30,8 @@ public class AmplifyImpostorBatchWindow : EditorWindow
     private bool animateCrossFading = true;
     private bool setStaticExceptBatching = false;
     private int lodFadeMode = 1; // 0=None, 1=CrossFade, 2=SpeedTree
+    private const float LOD0_THRESHOLD = 0.5f;
+    private const float LOD1_THRESHOLD = 0.01f;
 
     [MenuItem("Window/Amplify Impostors/Batch Converter", false, 2002)]
     public static void ShowWindow()
@@ -51,21 +53,19 @@ public class AmplifyImpostorBatchWindow : EditorWindow
 
     private void OnGUI()
     {
+        DrawGlobalSettingsUI();
+        DrawBatchControlsUI();
+        DrawPrefabListUI();
+        DrawOptionsUI();
+    }
+
+    private void DrawGlobalSettingsUI()
+    {
         EditorGUILayout.LabelField("Batch Convert Prefabs to Impostors", EditorStyles.boldLabel);
         EditorGUILayout.Space();
-
-        // Mode selection
         EditorGUILayout.LabelField("Batch Mode:", EditorStyles.label);
-        // batchMode = (BatchMode)EditorGUILayout.EnumPopup("Mode", batchMode);
-        // string modeDesc = batchMode == BatchMode.ModifyPrefabs ?
-        //     "Modify Prefabs: The original prefabs will be updated with the impostor component and settings." :
-        //     "Bake Only: Impostors will be baked, but the original prefabs will not be modified.";
-        // EditorGUILayout.HelpBox(modeDesc, MessageType.Info);
-        // EditorGUILayout.Space();
         EditorGUILayout.HelpBox("Modify Prefabs: The original prefabs will be updated with the impostor component and settings.", MessageType.Info);
         EditorGUILayout.Space();
-
-        // Global impostor settings
         EditorGUILayout.LabelField("Global Impostor Settings", EditorStyles.boldLabel);
         globalSettings = (AmplifyImpostorAsset)EditorGUILayout.ObjectField(
             "Impostor Asset Preset",
@@ -78,56 +78,16 @@ public class AmplifyImpostorBatchWindow : EditorWindow
             EditorGUILayout.HelpBox("Assign an AmplifyImpostorAsset to use as the global settings preset.", MessageType.Warning);
         }
         setStaticExceptBatching = EditorGUILayout.ToggleLeft("Set Static (except Static Batching)", setStaticExceptBatching);
-        // LOD Fade Mode dropdown
         lodFadeMode = EditorGUILayout.Popup("LOD Fade Mode", lodFadeMode, new[] { "None", "CrossFade", "SpeedTree" });
         if (lodFadeMode == 1 || lodFadeMode == 2)
         {
             animateCrossFading = EditorGUILayout.ToggleLeft("Animate Cross Fading", animateCrossFading);
         }
-
-        // Output folder selection for Bake Only mode (moved here, before prefab list)
-        // if (batchMode == BatchMode.BakeOnly)
-        // {
-        //     EditorGUILayout.Space();
-        //     EditorGUILayout.LabelField("Output Folder for Impostor Assets", EditorStyles.boldLabel);
-        //     outputFolderMode = (OutputFolderMode)EditorGUILayout.EnumPopup("Save Location", outputFolderMode);
-        //     if (outputFolderMode == OutputFolderMode.Custom)
-        //     {
-        //         EditorGUILayout.BeginHorizontal();
-        //         EditorGUILayout.LabelField("Custom Folder:", GUILayout.Width(100));
-        //         customOutputFolder = EditorGUILayout.TextField(customOutputFolder);
-        //         if (GUILayout.Button("...", GUILayout.Width(30)))
-        //         {
-        //             string selected = EditorUtility.OpenFolderPanel("Select Output Folder", string.IsNullOrEmpty(customOutputFolder) ? Application.dataPath : customOutputFolder, "");
-        //             if (!string.IsNullOrEmpty(selected))
-        //             {
-        //                 // Convert absolute path to relative project path if possible
-        //                 if (selected.StartsWith(Application.dataPath))
-        //                 {
-        //                     customOutputFolder = "Assets" + selected.Substring(Application.dataPath.Length);
-        //                 }
-        //                 else
-        //                 {
-        //                     customOutputFolder = selected;
-        //                 }
-        //             }
-        //         }
-        //         EditorGUILayout.EndHorizontal();
-        //         EditorGUILayout.HelpBox($"Impostor assets will be saved to: {customOutputFolder}", MessageType.Info);
-        //     }
-        //     else if (outputFolderMode == OutputFolderMode.NextToImpostorProfile && globalSettings != null)
-        //     {
-        //         string impostorProfilePath = AssetDatabase.GetAssetPath(globalSettings);
-        //         string impostorProfileDir = !string.IsNullOrEmpty(impostorProfilePath) ? System.IO.Path.GetDirectoryName(impostorProfilePath) : "";
-        //         EditorGUILayout.HelpBox($"Impostor assets will be saved next to the assigned impostor profile: {impostorProfileDir}", MessageType.Info);
-        //     }
-        //     else
-        //     {
-        //         EditorGUILayout.HelpBox("Impostor assets will be saved next to each prefab.", MessageType.Info);
-        //     }
-        // }
-
         EditorGUILayout.Space();
+    }
+
+    private void DrawBatchControlsUI()
+    {
         EditorGUI.BeginDisabledGroup(isBatchRunning);
         if (GUILayout.Button("Bake Impostors", GUILayout.Height(32)))
         {
@@ -145,8 +105,6 @@ public class AmplifyImpostorBatchWindow : EditorWindow
             }
         }
         EditorGUI.EndDisabledGroup();
-
-        // Remove per-prefab results from the window, just show a summary message
         if (!string.IsNullOrEmpty(status))
         {
             EditorGUILayout.HelpBox(status, MessageType.Info);
@@ -155,7 +113,6 @@ public class AmplifyImpostorBatchWindow : EditorWindow
         {
             EditorGUILayout.HelpBox(lastException, MessageType.Error);
         }
-        // Only show a summary message after batch
         if (isBatchRunning == false && batchResults.Count > 0)
         {
             EditorGUILayout.HelpBox("Batch complete. Check the Console for details.", MessageType.Info);
@@ -171,17 +128,17 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                 Repaint();
             }
         }
-
         EditorGUILayout.Space();
-        // Drag and drop area
+    }
+
+    private void DrawPrefabListUI()
+    {
         EditorGUILayout.LabelField("Drag Prefabs Here:", EditorStyles.label);
         Rect dropArea = GUILayoutUtility.GetRect(0, 50, GUILayout.ExpandWidth(true));
         GUI.Box(dropArea, "Drop Prefabs Here", EditorStyles.helpBox);
         HandleDragAndDrop(dropArea);
-
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Prefabs to Convert:", EditorStyles.label);
-        // Prefab list controls
         if (prefabList.Count > 0)
         {
             if (GUILayout.Button("Clear Prefab List"))
@@ -190,7 +147,6 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                 Repaint();
             }
         }
-        // Make the list fill the rest of the window
         float listHeight = Mathf.Max(120, position.height - 320);
         scrollPos = EditorGUILayout.BeginScrollView(scrollPos, GUILayout.ExpandHeight(true), GUILayout.Height(listHeight));
         for (int i = 0; i < prefabList.Count; i++)
@@ -205,8 +161,10 @@ public class AmplifyImpostorBatchWindow : EditorWindow
             EditorGUILayout.EndHorizontal();
         }
         EditorGUILayout.EndScrollView();
+    }
 
-        // Add LODGroup option
+    private void DrawOptionsUI()
+    {
         addLodIfMissing = EditorGUILayout.ToggleLeft("Add LODGroup if missing and set up LOD0/LOD1", addLodIfMissing);
     }
 
@@ -288,72 +246,21 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                     fail++;
                     continue;
                 }
-                // --- FIX: Define and populate sourceRenderers and lod0Child here ---
-                Renderer[] sourceRenderers = null;
-                Transform lod0Child = null;
-                // Enhanced: Prefer child named 'LOD 0' for source, else all valid mesh/skinned renderers
-                var allRenderers = instance.GetComponentsInChildren<MeshRenderer>(true)
-                    .Where(r => r != null && r.enabled)
-                    .Where(r => {
-                        var mf = r.GetComponent<MeshFilter>();
-                        return mf != null && mf.sharedMesh != null;
-                    })
-                    .Cast<Renderer>()
-                    .ToList();
-                // Optionally, include SkinnedMeshRenderers with a valid mesh
-                allRenderers.AddRange(instance.GetComponentsInChildren<SkinnedMeshRenderer>(true)
-                    .Where(r => r != null && r.enabled && r.sharedMesh != null)
-                    .Cast<Renderer>());
-                sourceRenderers = allRenderers.ToArray();
-
-                // If you want to prefer a child named 'LOD 0', do this:
-                lod0Child = instance.transform.Find("LOD0");
-                if (lod0Child != null)
-                {
-                    sourceRenderers = lod0Child.GetComponentsInChildren<MeshRenderer>(true)
-                        .Where(r => r != null && r.enabled)
-                        .Where(r => {
-                            var mf = r.GetComponent<MeshFilter>();
-                            return mf != null && mf.sharedMesh != null;
-                        })
-                        .Cast<Renderer>()
-                        .ToArray();
-                }
-
-                // If LODGroup exists, use LOD0's renderers as source (overrides above)
-                if (lodGroup != null)
-                {
-                    var lods = lodGroup.GetLODs();
-                    if (lods.Length > 0 && lods[0].renderers != null && lods[0].renderers.Length > 0)
-                        sourceRenderers = lods[0].renderers;
-                }
-                else if (addLodIfMissing)
-                {
-                    // Add LODGroup and set up LOD0/LOD1
-                    lodGroup = instance.AddComponent<LODGroup>();
-                    LOD[] lods = new LOD[2];
-                    lods[0] = new LOD(0.5f, sourceRenderers); // LOD0: source mesh
-                    lods[1] = new LOD(0.01f, new Renderer[0]); // LOD1: impostor will be assigned after bake
-                    lodGroup.SetLODs(lods);
-                }
-
-                // Defensive: skip if no valid renderers
+                // Use helper for source renderers
+                Renderer[] sourceRenderers = GetSourceRenderers(instance);
                 if (sourceRenderers == null || sourceRenderers.Length == 0)
                 {
                     Debug.LogError($"No valid mesh renderers with meshes found for prefab: {prefab.name}. Skipping impostor bake.");
                     continue;
                 }
-
                 // Ensure the source mesh is set for each renderer
                 foreach (var renderer in sourceRenderers)
                 {
-                    var meshRendererTmp = renderer as MeshRenderer;
-                    if (meshRendererTmp != null)
+                    if (renderer is MeshRenderer meshRendererTmp)
                     {
                         var meshFilter = meshRendererTmp.GetComponent<MeshFilter>();
                         if (meshFilter != null && meshFilter.sharedMesh == null)
                         {
-                            // Try to assign the mesh from the prefab if possible
                             var prefabMeshFilter = PrefabUtility.GetCorrespondingObjectFromSource(meshFilter) as MeshFilter;
                             if (prefabMeshFilter != null && prefabMeshFilter.sharedMesh != null)
                             {
@@ -362,7 +269,6 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                         }
                     }
                 }
-
                 AmplifyImpostor ai = instance.GetComponent<AmplifyImpostor>();
                 if (ai == null)
                     ai = instance.AddComponent<AmplifyImpostor>();
@@ -374,17 +280,11 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                     fail++;
                     continue;
                 }
-                // Create unique AmplifyImpostorAsset
                 string prefabDir = System.IO.Path.GetDirectoryName(path);
                 string impostorAssetPath = System.IO.Path.Combine(prefabDir, prefab.name + "_Impostor.asset").Replace("\\", "/");
                 string presetAssetPath = System.IO.Path.Combine(prefabDir, prefab.name + "_ImpostorPreset.asset").Replace("\\", "/");
-
-                // Create and copy AmplifyImpostorAsset
                 AmplifyImpostors.AmplifyImpostorAsset newAsset = ScriptableObject.CreateInstance<AmplifyImpostors.AmplifyImpostorAsset>();
                 AmplifyImpostors.AmplifyImpostorAsset refAsset = globalSettings;
-                // Do NOT copy Material and Mesh from the globalSettings; let the bake process generate and store them
-                // newAsset.Material = refAsset.Material;
-                // newAsset.Mesh = refAsset.Mesh;
                 newAsset.Version = refAsset.Version;
                 newAsset.ImpostorType = refAsset.ImpostorType;
                 newAsset.LockedSizes = refAsset.LockedSizes;
@@ -398,7 +298,6 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                 newAsset.Tolerance = refAsset.Tolerance;
                 newAsset.NormalScale = refAsset.NormalScale;
                 newAsset.ShapePoints = (Vector2[])refAsset.ShapePoints.Clone();
-                // Reuse the global preset
                 newAsset.Preset = refAsset.Preset;
                 newAsset.OverrideOutput = new System.Collections.Generic.List<AmplifyImpostors.TextureOutput>();
                 foreach (var output in refAsset.OverrideOutput)
@@ -406,16 +305,12 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                     newAsset.OverrideOutput.Add(output != null ? output.Clone() : null);
                 }
                 AssetDatabase.CreateAsset(newAsset, impostorAssetPath);
-
                 ai.Data = newAsset;
-                AssetDatabase.SaveAssets(); // Ensure the asset is registered before baking
-
+                AssetDatabase.SaveAssets();
                 ai.Renderers = sourceRenderers;
                 ai.m_impostorName = prefab.name + "_Impostor";
                 ai.RenderAllDeferredGroups(ai.Data);
-                AssetDatabase.SaveAssets(); // Ensure sub-assets are saved
-
-                // Ensure impostor GameObject uses the correct mesh and material
+                AssetDatabase.SaveAssets();
                 if (ai.m_lastImpostor != null && ai.Data != null)
                 {
                     var mf = ai.m_lastImpostor.GetComponent<MeshFilter>();
@@ -423,66 +318,42 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                     var mr = ai.m_lastImpostor.GetComponent<MeshRenderer>();
                     if (mr != null) mr.sharedMaterial = ai.Data.Material;
                 }
-
-                // After baking, ensure mesh and material are sub-assets of the impostor asset
                 if (ai.Data != null)
                 {
                     if (ai.Data.Mesh != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(ai.Data.Mesh)))
                         AssetDatabase.AddObjectToAsset(ai.Data.Mesh, ai.Data);
                     if (ai.Data.Material != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(ai.Data.Material)))
                         AssetDatabase.AddObjectToAsset(ai.Data.Material, ai.Data);
-                    AssetDatabase.SaveAssets();
-                    AssetDatabase.Refresh();
                 }
-
-                // Copy material properties from the source mesh to the baked impostor material using TVE inspector logic
-                MeshRenderer meshRenderer = null;
-                foreach (var r in sourceRenderers)
-                {
-                    meshRenderer = r as MeshRenderer;
-                    if (meshRenderer != null && meshRenderer.sharedMaterial != null)
-                        break;
-                }
-
+                // Use helper for main impostor material
+                MeshRenderer meshRenderer = sourceRenderers.OfType<MeshRenderer>().FirstOrDefault(mr => mr.sharedMaterial != null);
                 if (meshRenderer != null && ai.Data.Material != null)
                 {
-                    TVEUtils.CopyMaterialPropertiesToImpostor(meshRenderer, ai.Data.Material);
-                    TVEUtils.SetMaterialSettings(ai.Data.Material);
-                    EditorUtility.SetDirty(ai.Data.Material);
+                    CopyImpostorMaterialProperties(meshRenderer, ai.Data.Material);
                 }
                 else
                 {
                     Debug.LogWarning($"[BatchTool] No valid MeshRenderer with material found for prefab: {prefab.name}");
                 }
-
-                // After baking, assign impostor to LOD1 (or last LOD) using only the renderers from the 'Impostor' child GameObject
                 GameObject impostorGO = ai.m_lastImpostor;
-                
-                // --- TVE: Copy material properties from source mesh to impostor mesh ---
                 if (impostorGO != null && sourceRenderers != null && sourceRenderers.Length > 0)
                 {
                     var impostorRenderers = impostorGO.GetComponentsInChildren<MeshRenderer>(true);
                     int rendererCount = Mathf.Min(sourceRenderers.Length, impostorRenderers.Length);
                     for (int r = 0; r < rendererCount; r++)
                     {
-                        var meshRenderer2 = sourceRenderers[r] as MeshRenderer;
-                        var impostorMaterial = impostorRenderers[r].sharedMaterial;
-                        if (meshRenderer2 != null && impostorMaterial != null)
+                        if (sourceRenderers[r] is MeshRenderer meshRenderer2 && impostorRenderers[r].sharedMaterial != null)
                         {
-                            TVEUtils.CopyMaterialPropertiesToImpostor(meshRenderer2, impostorMaterial);
-                            TVEUtils.SetMaterialSettings(impostorMaterial);
-                            EditorUtility.SetDirty(impostorMaterial);
+                            CopyImpostorMaterialProperties(meshRenderer2, impostorRenderers[r].sharedMaterial);
                         }
                     }
                 }
-
                 if (impostorGO != null)
                 {
                     if (lodGroup != null)
                         impostorGO.transform.SetParent(lodGroup.transform, false);
                     else
                         impostorGO.transform.SetParent(instance.transform, false);
-
                     impostorGO.transform.localPosition = Vector3.zero;
                     impostorGO.transform.localRotation = Quaternion.identity;
                     impostorGO.transform.localScale = Vector3.one;
@@ -490,7 +361,6 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                     impostorGO.transform.rotation = impostorGO.transform.parent.rotation;
                     Debug.Log($"[BatchTool] Impostor '{impostorGO.name}' parent: {impostorGO.transform.parent?.name}, localPosition: {impostorGO.transform.localPosition}, localRotation: {impostorGO.transform.localRotation.eulerAngles}, localScale: {impostorGO.transform.localScale}");
                 }
-
                 if (lodGroup != null && impostorGO != null)
                 {
                     var lods = lodGroup.GetLODs();
@@ -501,17 +371,16 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                     }
                     else if (lods.Length == 1)
                     {
-                        // Add a second LOD for the impostor
                         Array.Resize(ref lods, 2);
-                        lods[1] = new LOD(0.01f, impostorRenderers);
+                        lods[1] = new LOD(LOD1_THRESHOLD, impostorRenderers);
                     }
                     lodGroup.SetLODs(lods);
                     Debug.Log($"Assigned impostor to last LOD for prefab: {prefab.name}");
                 }
                 else if (lodGroup == null && impostorGO != null && addLodIfMissing)
                 {
-                    // --- Create LOD0 child and move renderers if no LODGroup exists ---
                     var origRenderers = sourceRenderers;
+                    var lod0Child = instance.transform.Find("LOD0");
                     if (lod0Child == null)
                     {
                         var lod0GO = new GameObject("LOD0");
@@ -522,13 +391,10 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                         lod0Child = lod0GO.transform;
                         foreach (var renderer in origRenderers)
                         {
-                            if (renderer != null)
-                            {
-                                renderer.transform.SetParent(lod0Child, false);
-                                renderer.transform.localPosition = Vector3.zero;
-                                renderer.transform.localRotation = Quaternion.identity;
-                                renderer.transform.localScale = Vector3.one;
-                            }
+                            renderer.transform.SetParent(lod0Child, false);
+                            renderer.transform.localPosition = Vector3.zero;
+                            renderer.transform.localRotation = Quaternion.identity;
+                            renderer.transform.localScale = Vector3.one;
                         }
                     }
                     else
@@ -546,12 +412,11 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                             child.localScale = Vector3.one;
                         }
                     }
-                    // Add LODGroup and set up LOD0 (original), LOD1 (impostor)
                     lodGroup = instance.AddComponent<LODGroup>();
                     var impostorRenderers = impostorGO.GetComponentsInChildren<Renderer>();
                     LOD[] lods = new LOD[2];
-                    lods[0] = new LOD(0.5f, origRenderers);
-                    lods[1] = new LOD(0.01f, impostorRenderers);
+                    lods[0] = new LOD(LOD0_THRESHOLD, origRenderers);
+                    lods[1] = new LOD(LOD1_THRESHOLD, impostorRenderers);
                     lodGroup.SetLODs(lods);
                     Debug.Log($"Created LODGroup and assigned impostor to LOD1 for prefab: {prefab.name}");
                 }
@@ -566,12 +431,10 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                 if (setStaticExceptBatching && instance != null)
                 {
                     var flags = StaticEditorFlags.ContributeGI | StaticEditorFlags.OccluderStatic | StaticEditorFlags.OccludeeStatic | StaticEditorFlags.ReflectionProbeStatic;
-                    // Set on root
                     GameObjectUtility.SetStaticEditorFlags(instance, flags);
-                    // Set on all children recursively
                     foreach (Transform t in instance.GetComponentsInChildren<Transform>(true))
                     {
-                        if (t == instance.transform) continue; // already set root
+                        if (t == instance.transform) continue;
                         GameObjectUtility.SetStaticEditorFlags(t.gameObject, flags);
                     }
                 }
@@ -605,6 +468,48 @@ public class AmplifyImpostorBatchWindow : EditorWindow
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
         Repaint();
+    }
+
+    // Helper: Get source renderers for a prefab instance
+    private Renderer[] GetSourceRenderers(GameObject instance)
+    {
+        // Prefer LOD0 child if present
+        var lod0Child = instance.transform.Find("LOD0");
+        if (lod0Child != null)
+        {
+            return lod0Child.GetComponentsInChildren<MeshRenderer>(true)
+                .Where(r => r != null && r.enabled && r.GetComponent<MeshFilter>()?.sharedMesh != null)
+                .Cast<Renderer>()
+                .ToArray();
+        }
+        // Prefer LODGroup LOD0 if present
+        var lodGroup = instance.GetComponent<LODGroup>();
+        if (lodGroup != null)
+        {
+            var lods = lodGroup.GetLODs();
+            if (lods.Length > 0 && lods[0].renderers != null && lods[0].renderers.Length > 0)
+                return lods[0].renderers;
+        }
+        // Fallback: all valid mesh/skinned renderers
+        var allRenderers = instance.GetComponentsInChildren<MeshRenderer>(true)
+            .Where(r => r != null && r.enabled && r.GetComponent<MeshFilter>()?.sharedMesh != null)
+            .Cast<Renderer>()
+            .ToList();
+        allRenderers.AddRange(instance.GetComponentsInChildren<SkinnedMeshRenderer>(true)
+            .Where(r => r != null && r.enabled && r.sharedMesh != null)
+            .Cast<Renderer>());
+        return allRenderers.ToArray();
+    }
+
+    // Helper: Copy impostor material properties
+    private void CopyImpostorMaterialProperties(MeshRenderer source, Material target)
+    {
+        if (source != null && target != null)
+        {
+            TVEUtils.CopyMaterialPropertiesToImpostor(source, target);
+            TVEUtils.SetMaterialSettings(target);
+            EditorUtility.SetDirty(target);
+        }
     }
 }
 #endif 

@@ -436,17 +436,23 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                 }
 
                 // Copy material properties from the source mesh to the baked impostor material using TVE inspector logic
-                MeshRenderer meshRenderer = null;
+                Material srcMat = null;
+                string impostorType = TVEUtils.GetShaderLightingType(ai.Data.Material);
                 foreach (var r in sourceRenderers)
                 {
-                    meshRenderer = r as MeshRenderer;
-                    if (meshRenderer != null && meshRenderer.sharedMaterial != null)
-                        break;
+                    var mr = r as MeshRenderer;
+                    if (mr != null && mr.sharedMaterial != null)
+                    {
+                        var type = TVEUtils.GetShaderLightingType(mr.sharedMaterial);
+                        if (type == impostorType)
+                        {
+                            srcMat = mr.sharedMaterial;
+                            break;
+                        }
+                    }
                 }
-
-                if (meshRenderer != null && ai.Data.Material != null)
+                if (srcMat != null && ai.Data.Material != null)
                 {
-                    var srcMat = meshRenderer.sharedMaterial;
                     var dstMat = ai.Data.Material;
                     TVEUtils.CopyMaterialProperties(srcMat, dstMat);
                     TVEUtils.SetImpostorFeatures(srcMat, dstMat);
@@ -456,7 +462,7 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                 }
                 else
                 {
-                    Debug.LogWarning($"[BatchTool] No valid MeshRenderer with material found for prefab: {prefab.name}");
+                    Debug.LogWarning($"[BatchTool] No valid MeshRenderer with matching material type found for prefab: {prefab.name}");
                 }
 
                 // After baking, assign impostor to LOD1 (or last LOD) using only the renderers from the 'Impostor' child GameObject
@@ -473,12 +479,17 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                         var impostorMaterial = impostorRenderers[r].sharedMaterial;
                         if (meshRenderer2 != null && impostorMaterial != null)
                         {
+                            var impostorType2 = TVEUtils.GetShaderLightingType(impostorMaterial);
                             var srcMat2 = meshRenderer2.sharedMaterial;
-                            TVEUtils.CopyMaterialProperties(srcMat2, impostorMaterial);
-                            TVEUtils.SetImpostorFeatures(srcMat2, impostorMaterial);
-                            impostorMaterial.SetFloat("_IsInitialized", 1);
-                            TVEUtils.SetMaterialSettings(impostorMaterial);
-                            EditorUtility.SetDirty(impostorMaterial);
+                            var srcType2 = TVEUtils.GetShaderLightingType(srcMat2);
+                            if (srcType2 == impostorType2)
+                            {
+                                TVEUtils.CopyMaterialProperties(srcMat2, impostorMaterial);
+                                TVEUtils.SetImpostorFeatures(srcMat2, impostorMaterial);
+                                impostorMaterial.SetFloat("_IsInitialized", 1);
+                                TVEUtils.SetMaterialSettings(impostorMaterial);
+                                EditorUtility.SetDirty(impostorMaterial);
+                            }
                         }
                     }
                 }
@@ -582,18 +593,16 @@ public class AmplifyImpostorBatchWindow : EditorWindow
                         GameObjectUtility.SetStaticEditorFlags(t.gameObject, flags);
                     }
                 }
-                if (batchMode == BatchMode.ModifyPrefabs && impostorGO != null)
-                    PrefabUtility.ApplyPrefabInstance(instance, InteractionMode.AutomatedAction);
-                batchResults.Add($"[{idx}] Success: {prefab.name}");
-                success++;
-
-                // In RunBatchConvert, after creating or updating the LODGroup, set cross-fade and animateCrossFading
                 if (lodGroup != null)
                 {
                     lodGroup.fadeMode = (UnityEngine.LODFadeMode)lodFadeMode;
                     lodGroup.animateCrossFading = animateCrossFading;
                     EditorUtility.SetDirty(lodGroup);
                 }
+                if (batchMode == BatchMode.ModifyPrefabs && impostorGO != null)
+                    PrefabUtility.ApplyPrefabInstance(instance, InteractionMode.AutomatedAction);
+                batchResults.Add($"[{idx}] Success: {prefab.name}");
+                success++;
             }
             catch (System.Exception ex)
             {
